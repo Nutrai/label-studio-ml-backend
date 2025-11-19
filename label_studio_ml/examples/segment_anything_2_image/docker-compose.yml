@@ -32,18 +32,18 @@ services:
       # specify the model directory (likely you don't need to change this)
       - MODEL_DIR=/data/models
       # specify device
-      - DEVICE=cuda  # or 'cpu' (coming soon)
-      # SAM2 model config
-      - MODEL_CONFIG=configs/sam2.1/sam2.1_hiera_l.yaml
+      - DEVICE=cpu  # or 'cuda' (requires GPU)
+      # SAM2 model config (using tiny for faster CPU inference)
+      - MODEL_CONFIG=configs/sam2.1/sam2.1_hiera_t.yaml
       # SAM2 checkpoint
-      - MODEL_CHECKPOINT=sam2.1_hiera_large.pt
+      - MODEL_CHECKPOINT=sam2.1_hiera_tiny.pt
 
       # Specify the Label Studio URL and API key to access
       # uploaded, local storage and cloud storage files.
       # Do not use 'localhost' as it does not work within Docker containers.
       # Use prefix 'http://' or 'https://' for the URL always.
       # Determine the actual IP using 'ifconfig' (Linux/Mac) or 'ipconfig' (Windows).
-      - LABEL_STUDIO_URL=
+      - LABEL_STUDIO_URL=http://172.31.39.2:8080
       - LABEL_STUDIO_API_KEY=
     ports:
       - "9090:9090"

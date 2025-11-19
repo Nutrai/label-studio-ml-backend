@@ -20,7 +20,7 @@ DEVICE = os.getenv('DEVICE', 'cuda')
 MODEL_CONFIG = os.getenv('MODEL_CONFIG', 'configs/sam2.1/sam2.1_hiera_l.yaml')
 MODEL_CHECKPOINT = os.getenv('MODEL_CHECKPOINT', 'sam2.1_hiera_large.pt')
 
-if DEVICE == 'cuda':
+if DEVICE == 'cuda' and torch.cuda.is_available():
     # use bfloat16 for the entire notebook
     torch.autocast(device_type="cuda", dtype=torch.bfloat16).__enter__()
 
@@ -28,6 +28,9 @@ if DEVICE == 'cuda':
         # turn on tfloat32 for Ampere GPUs (https://pytorch.org/docs/stable/notes/cuda.html#tensorfloat-32-tf32-on-ampere-devices)
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.allow_tf32 = True
+elif DEVICE == 'cuda' and not torch.cuda.is_available():
+    print("WARNING: CUDA device requested but not available. Falling back to CPU.")
+    DEVICE = 'cpu'
 
 
 # build path to the model checkpoint
