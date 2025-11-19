@@ -7,7 +7,6 @@ from typing import List, Dict, Optional
 from uuid import uuid4
 from label_studio_ml.model import LabelStudioMLBase
 from label_studio_ml.response import ModelResponse
-from label_studio_sdk.converter import brush
 from label_studio_sdk._extensions.label_studio_tools.core.utils.io import get_local_path
 from PIL import Image
 
@@ -43,15 +42,42 @@ class NewModel(LabelStudioMLBase):
     """Custom ML Backend model
     """
 
+    def mask_to_bbox(self, mask):
+        """Convert binary mask to bounding box coordinates."""
+        rows = np.any(mask, axis=1)
+        cols = np.any(mask, axis=0)
+        
+        if not rows.any() or not cols.any():
+            return None
+            
+        rmin, rmax = np.where(rows)[0][[0, -1]]
+        cmin, cmax = np.where(cols)[0][[0, -1]]
+        
+        return {
+            'x': int(cmin),
+            'y': int(rmin),
+            'width': int(cmax - cmin),
+            'height': int(rmax - rmin)
+        }
+
     def get_results(self, masks, probs, width, height, from_name, to_name, label):
         results = []
         total_prob = 0
         for mask, prob in zip(masks, probs):
             # creates a random ID for your label everytime so no chance for errors
             label_id = str(uuid4())[:4]
-            # converting the mask from the model to RLE format which is usable in Label Studio
-            mask = mask * 255
-            rle = brush.mask2rle(mask)
+            
+            # Convert mask to bounding box
+            bbox = self.mask_to_bbox(mask)
+            if bbox is None:
+                continue
+            
+            # Convert pixel coordinates to percentages for Label Studio
+            x_percent = (bbox['x'] / width) * 100
+            y_percent = (bbox['y'] / height) * 100
+            width_percent = (bbox['width'] / width) * 100
+            height_percent = (bbox['height'] / height) * 100
+            
             total_prob += prob
             results.append({
                 'id': label_id,
@@ -61,12 +87,14 @@ class NewModel(LabelStudioMLBase):
                 'original_height': height,
                 'image_rotation': 0,
                 'value': {
-                    'format': 'rle',
-                    'rle': rle,
-                    'brushlabels': [label],
+                    'x': x_percent,
+                    'y': y_percent,
+                    'width': width_percent,
+                    'height': height_percent,
+                    'rectanglelabels': [label],
                 },
                 'score': prob,
-                'type': 'brushlabels',
+                'type': 'rectanglelabels',
                 'readonly': False
             })
 
@@ -107,9 +135,9 @@ class NewModel(LabelStudioMLBase):
 
 
     def predict(self, tasks: List[Dict], context: Optional[Dict] = None, **kwargs) -> ModelResponse:
-        """ Returns the predicted mask for a smart keypoint that has been placed."""
+        """ Returns the predicted bounding box for a smart keypoint that has been placed."""
 
-        from_name, to_name, value = self.get_first_tag_occurence('BrushLabels', 'Image')
+        from_name, to_name, value = self.get_first_tag_occurence('RectangleLabels', 'Image')
 
         if not context or not context.get('result'):
             # if there is no context, no interaction has happened yet

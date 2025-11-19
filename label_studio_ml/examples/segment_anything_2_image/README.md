@@ -38,12 +38,12 @@ Note that as of 8/1/2024, SAM2 only runs on GPU.
 ## Labeling configuration
 
 The current implementation of the Label Studio SAM2 ML backend works using Interactive mode. The user-guided inputs are:
-- `KeypointLabels`
-- `RectangleLabels`
+- `KeypointLabels` (smart keypoints for object indication)
+- `RectangleLabels` (can be used both as input prompts and as the detection output)
 
-And then SAM2 outputs `BrushLabels` as a result.
+SAM2 will use the segmentation masks internally, but the output will be converted to bounding box detections (`RectangleLabels`).
 
-This means all three control tags should be represented in your labeling configuration:
+The labeling configuration should include control tags for interactive prompts and detection output:
 
 ```xml
 <View>
@@ -87,30 +87,21 @@ This means all three control tags should be represented in your labeling configu
 <View className="main">
   <View className="container">
     <View className="column">
-      <View className="title">Choose Label</View>
+      <View className="title">Choose Label & See Detections</View>
       <View className="label">
-        <BrushLabels name="tag" toName="image">
-          
-          
-        <Label value="defect" background="#FFA39E"/></BrushLabels>
+        <RectangleLabels name="tag" toName="image" smart="true">
+          <Label value="object" background="#FFA39E"/>
+          <Label value="defect" background="#FFC069"/>
+        </RectangleLabels>
       </View>
     </View>
     <View className="column">
-      <View className="title">Use Keypoint</View>
+      <View className="title">Use Keypoint for Guidance</View>
       <View className="label">
         <KeyPointLabels name="tag2" toName="image" smart="true">
-          
-          
-        <Label value="defect" background="#250dd3"/></KeyPointLabels>
-      </View>
-    </View>
-    <View className="column">
-      <View className="title">Use Rectangle</View>
-      <View className="label">
-        <RectangleLabels name="tag3" toName="image" smart="true">
-          
-          
-        <Label value="defect" background="#FFC069"/></RectangleLabels>
+          <Label value="object" background="#250dd3"/>
+          <Label value="defect" background="#250dd3"/>
+        </KeyPointLabels>
       </View>
     </View>
   </View>
