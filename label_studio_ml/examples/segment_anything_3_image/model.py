@@ -74,28 +74,23 @@ class Sam3Backend(LabelStudioMLBase):
             target_sizes=inputs.get("original_sizes").tolist()
         )[0]
 
-        # build union of all input boxes as clipping region
-        clip_mask = np.zeros((image_height, image_width), dtype=bool)
-        for box in boxes:
-            x1, y1, x2, y2 = box
-            clip_mask[y1:y2, x1:x2] = True
-
-        # build predictions
-        results = []
-        total_score = 0
+        # find largest mask
+        best_mask = None
+        best_score = 0
+        best_area = 0
         for mask_tensor, score_tensor in zip(sam_results['masks'], sam_results['scores']):
-            mask = (mask_tensor.cpu().numpy() > 0)
-            # clip mask to rectangle bounds
-            mask = (mask & clip_mask).astype(np.uint8) * 255
-            if mask.sum() == 0:
-                continue
-            score = float(score_tensor.cpu().item())
+            mask = (mask_tensor.cpu().numpy() > 0).astype(np.uint8)
+            area = mask.sum()
+            if area > best_area:
+                best_area = area
+                best_mask = mask
+                best_score = float(score_tensor.cpu().item())
 
-            label_id = str(uuid4())[:9]
-            rle = brush.mask2rle(mask)
-
+        results = []
+        if best_mask is not None:
+            rle = brush.mask2rle(best_mask * 255)
             results.append({
-                'id': label_id,
+                'id': str(uuid4())[:9],
                 'from_name': from_name,
                 'to_name': to_name,
                 'original_width': image_width,
@@ -106,16 +101,15 @@ class Sam3Backend(LabelStudioMLBase):
                     'rle': rle,
                     'brushlabels': [TEXT_PROMPT],
                 },
-                'score': score,
+                'score': best_score,
                 'type': 'brushlabels',
                 'readonly': False
             })
-            total_score += score
 
         predictions = [{
             'result': results,
             'model_version': self.get('model_version'),
-            'score': total_score / max(len(results), 1)
+            'score': best_score
         }]
 
         return ModelResponse(predictions=predictions)
