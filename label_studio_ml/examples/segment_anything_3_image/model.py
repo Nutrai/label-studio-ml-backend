@@ -74,11 +74,21 @@ class Sam3Backend(LabelStudioMLBase):
             target_sizes=inputs.get("original_sizes").tolist()
         )[0]
 
+        # build union of all input boxes as clipping region
+        clip_mask = np.zeros((image_height, image_width), dtype=bool)
+        for box in boxes:
+            x1, y1, x2, y2 = box
+            clip_mask[y1:y2, x1:x2] = True
+
         # build predictions
         results = []
         total_score = 0
         for mask_tensor, score_tensor in zip(sam_results['masks'], sam_results['scores']):
-            mask = (mask_tensor.cpu().numpy() > 0).astype(np.uint8) * 255
+            mask = (mask_tensor.cpu().numpy() > 0)
+            # clip mask to rectangle bounds
+            mask = (mask & clip_mask).astype(np.uint8) * 255
+            if mask.sum() == 0:
+                continue
             score = float(score_tensor.cpu().item())
 
             label_id = str(uuid4())[:9]
