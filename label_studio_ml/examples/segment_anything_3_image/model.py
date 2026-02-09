@@ -67,21 +67,19 @@ class Sam3Backend(LabelStudioMLBase):
             outputs = model(**inputs)
 
         # post-process
-        results_list = processor.post_process_instance_segmentation(
+        sam_results = processor.post_process_instance_segmentation(
             outputs,
             threshold=SCORE_THRESHOLD,
             mask_threshold=0.5,
-            target_sizes=[(image_height, image_width)]
-        )
+            target_sizes=inputs.get("original_sizes").tolist()
+        )[0]
 
         # build predictions
         results = []
         total_score = 0
-        segments = results_list[0]
-        for segment in segments['segments_info']:
-            mask_id = segment['id']
-            score = float(segment['score'])
-            mask = (segments['segmentation'] == mask_id).cpu().numpy().astype(np.uint8) * 255
+        for mask_tensor, score_tensor in zip(sam_results['masks'], sam_results['scores']):
+            mask = (mask_tensor.cpu().numpy() > 0).astype(np.uint8) * 255
+            score = float(score_tensor.cpu().item())
 
             label_id = str(uuid4())[:9]
             rle = brush.mask2rle(mask)
