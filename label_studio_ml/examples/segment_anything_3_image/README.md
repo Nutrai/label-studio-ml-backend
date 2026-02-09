@@ -21,14 +21,22 @@ Backend runs at `http://localhost:9090`.
 ```xml
 <View>
   <Image name="image" value="$image"/>
-  <RectangleLabels name="rect" toName="image">
-    <Label value="food"/>
+  <RectangleLabels name="rect" toName="image" smart="true">
+    <Label value="food" hint="text+box: segment food within rectangle"/>
+    <Label value="box" hint="box only: segment anything within rectangle"/>
+    <Label value="text" hint="text only: segment all food in image"/>
   </RectangleLabels>
-  <BrushLabels name="brush" toName="image">
+  <BrushLabels name="brush" toName="image" smart="true">
     <Label value="food"/>
   </BrushLabels>
 </View>
 ```
+
+### Prompt Modes (selected via rectangle label)
+
+- **food** — text("food") + box prompt (best for food-specific segmentation)
+- **box** — box prompt only (segments dominant object in rectangle)
+- **text** — text("food") only (finds all food in entire image)
 
 ## Environment Variables
 

@@ -15,8 +15,10 @@ DEVICE = os.getenv('DEVICE', 'cuda')
 MODEL_NAME = os.getenv('MODEL_NAME', 'facebook/sam3')
 TEXT_PROMPT = os.getenv('TEXT_PROMPT', 'food')
 SCORE_THRESHOLD = float(os.getenv('SCORE_THRESHOLD', '0.25'))
-# Prompt mode: "text+box" (default), "text", or "box"
-PROMPT_MODE = os.getenv('PROMPT_MODE', 'text+box')
+# Label name → prompt mode mapping
+# "food" (or TEXT_PROMPT value) → text+box, "box" → box only, "text" → text only
+BOX_ONLY_LABEL = os.getenv('BOX_ONLY_LABEL', 'box')
+TEXT_ONLY_LABEL = os.getenv('TEXT_ONLY_LABEL', 'text')
 
 if DEVICE == 'cuda' and not torch.cuda.is_available():
     print("WARNING: CUDA requested but not available. Falling back to CPU.")
@@ -37,8 +39,9 @@ class Sam3Backend(LabelStudioMLBase):
         image_width = context['result'][0]['original_width']
         image_height = context['result'][0]['original_height']
 
-        # collect rectangle boxes from context
+        # collect rectangle boxes and determine prompt mode from label
         boxes = []
+        selected_label = None
         for ctx in context['result']:
             ctx_type = ctx['type']
             if ctx_type == 'rectanglelabels':
@@ -47,20 +50,31 @@ class Sam3Backend(LabelStudioMLBase):
                 w = ctx['value']['width'] * image_width / 100
                 h = ctx['value']['height'] * image_height / 100
                 boxes.append([int(x), int(y), int(x + w), int(y + h)])
+                selected_label = ctx['value'].get('rectanglelabels', [None])[0]
 
         if not boxes:
             return ModelResponse(predictions=[])
+
+        # determine prompt mode from selected label
+        if selected_label == BOX_ONLY_LABEL:
+            prompt_mode = 'box'
+        elif selected_label == TEXT_ONLY_LABEL:
+            prompt_mode = 'text'
+        else:
+            prompt_mode = 'text+box'
+
+        print(f'Prompt mode: {prompt_mode} (label={selected_label})')
 
         # load image
         img_url = tasks[0]['data'][value]
         image_path = get_local_path(img_url, task_id=tasks[0].get('id'))
         image = Image.open(image_path).convert("RGB")
 
-        # run model with configured prompt mode
+        # run model with prompt mode determined by label
         proc_kwargs = dict(images=image, return_tensors="pt")
-        if PROMPT_MODE in ('text+box', 'text'):
+        if prompt_mode in ('text+box', 'text'):
             proc_kwargs['text'] = TEXT_PROMPT
-        if PROMPT_MODE in ('text+box', 'box'):
+        if prompt_mode in ('text+box', 'box'):
             proc_kwargs['input_boxes'] = [boxes]
             proc_kwargs['input_boxes_labels'] = [[1] * len(boxes)]
         inputs = processor(**proc_kwargs).to(DEVICE)
