@@ -15,6 +15,8 @@ DEVICE = os.getenv('DEVICE', 'cuda')
 MODEL_NAME = os.getenv('MODEL_NAME', 'facebook/sam3')
 TEXT_PROMPT = os.getenv('TEXT_PROMPT', 'food')
 SCORE_THRESHOLD = float(os.getenv('SCORE_THRESHOLD', '0.25'))
+# Prompt mode: "text+box" (default), "text", or "box"
+PROMPT_MODE = os.getenv('PROMPT_MODE', 'text+box')
 
 if DEVICE == 'cuda' and not torch.cuda.is_available():
     print("WARNING: CUDA requested but not available. Falling back to CPU.")
@@ -54,14 +56,14 @@ class Sam3Backend(LabelStudioMLBase):
         image_path = get_local_path(img_url, task_id=tasks[0].get('id'))
         image = Image.open(image_path).convert("RGB")
 
-        # run model
-        inputs = processor(
-            images=image,
-            text=TEXT_PROMPT,
-            input_boxes=[boxes],
-            input_boxes_labels=[[1] * len(boxes)],
-            return_tensors="pt"
-        ).to(DEVICE)
+        # run model with configured prompt mode
+        proc_kwargs = dict(images=image, return_tensors="pt")
+        if PROMPT_MODE in ('text+box', 'text'):
+            proc_kwargs['text'] = TEXT_PROMPT
+        if PROMPT_MODE in ('text+box', 'box'):
+            proc_kwargs['input_boxes'] = [boxes]
+            proc_kwargs['input_boxes_labels'] = [[1] * len(boxes)]
+        inputs = processor(**proc_kwargs).to(DEVICE)
 
         with torch.no_grad():
             outputs = model(**inputs)
