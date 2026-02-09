@@ -74,15 +74,24 @@ class Sam3Backend(LabelStudioMLBase):
             target_sizes=inputs.get("original_sizes").tolist()
         )[0]
 
-        # find largest mask
+        # build bbox mask for IoU computation
+        bbox_mask = np.zeros((image_height, image_width), dtype=bool)
+        for box in boxes:
+            x1, y1, x2, y2 = box
+            bbox_mask[y1:y2, x1:x2] = True
+        bbox_area = bbox_mask.sum()
+
+        # select mask with highest IoU against the drawn bbox
         best_mask = None
         best_score = 0
-        best_area = 0
+        best_iou = 0
         for mask_tensor, score_tensor in zip(sam_results['masks'], sam_results['scores']):
             mask = (mask_tensor.cpu().numpy() > 0).astype(np.uint8)
-            area = mask.sum()
-            if area > best_area:
-                best_area = area
+            intersection = (mask & bbox_mask).sum()
+            union = mask.sum() + bbox_area - intersection
+            iou = intersection / max(union, 1)
+            if iou > best_iou:
+                best_iou = iou
                 best_mask = mask
                 best_score = float(score_tensor.cpu().item())
 
