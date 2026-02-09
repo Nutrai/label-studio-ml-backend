@@ -1,0 +1,36 @@
+version: "3.8"
+
+services:
+  sam3-backend:
+    container_name: sam3-backend
+    build:
+      context: .
+      args:
+        TEST_ENV: ${TEST_ENV}
+
+    runtime: nvidia
+
+    environment:
+      - LOG_LEVEL=DEBUG
+      - WORKERS=1
+      - THREADS=4
+      - MODEL_DIR=/data/models
+      - DEVICE=cuda
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      # SAM3 config
+      - MODEL_NAME=facebook/sam3
+      - TEXT_PROMPT=food
+      - SCORE_THRESHOLD=0.25
+      # HuggingFace token for gated model access
+      - HF_TOKEN=${HF_TOKEN}
+      # Label Studio connection
+      - LABEL_STUDIO_URL=${LABEL_STUDIO_URL:-http://host.docker.internal:8080}
+      - LABEL_STUDIO_API_KEY=${LABEL_STUDIO_API_KEY}
+    ports:
+      - "9090:9090"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - "./data/server:/data"
+      - "${HF_HOME:-~/.cache/huggingface}:/root/.cache/huggingface"
